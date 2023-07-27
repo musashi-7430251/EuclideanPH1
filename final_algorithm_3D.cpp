@@ -20,6 +20,9 @@
 #include <CGAL/Delaunay_triangulation_3.h>
 #include <CGAL/Delaunay_triangulation_cell_base_3.h>
 #include <CGAL/Triangulation_vertex_base_with_info_3.h>
+#include <fstream>
+#include <stdexcept> // std::runtime_error
+#include <sstream> // std::stringstream
 
 using namespace nanoflann;
 using namespace std;
@@ -368,16 +371,67 @@ double diam (vector<size_t> vec, vector<vector<double>> & point_matrix){
     }
 }
 
+//=========================================CODE FOR READING CSV
+
+vector<vector<double>> read_csv(string filename){
+    // Reads a CSV file into a vector of <string, vector<int>> pairs where
+    // each pair represents <column name, column values>
+
+    // Create a vector of <string, int vector> pairs to store the result
+    vector<vector<double>> result;
+
+    // Create an input filestream
+    ifstream myFile(filename);
+
+    // Make sure the file is open
+    if(!myFile.is_open()) throw runtime_error("Could not open file");
+
+    // Helper vars
+    string line;
+    double val;
+
+    // Read data, line by line
+    while(getline(myFile, line))
+    {
+        // Create a stringstream of the current line
+        stringstream ss(line);
+
+        // Keep track of the current column index
+        vector<double> new_vector;
+        // Extract each integer
+        while(ss >> val){
+            cout << val << endl;
+            // Add the current integer to the 'colIdx' column's values vector
+            new_vector.push_back(val);
+
+            // If the next token is a comma, ignore it and move on
+            if(ss.peek() == ',') ss.ignore();
+
+
+        }
+        if (! new_vector.empty()) {
+            result.push_back(new_vector);
+            new_vector.clear();
+        }
+    }
+
+    // Close file
+    myFile.close();
+
+    return result;
+}
+
 int main (){
     auto start = high_resolution_clock::now();
     //First we start off with basic information needed for both computing RNG and persistence
 
-    size_t n = 110000; // number of points
+    //size_t n = 100; // number of points
 
     double max_range = 10.0; //used in generating max point cloud
-    const size_t num_neighbors = 100;
-    vector<vector<double>> point_matrix; // used for storing the point cloud.
-    generateRandomPointCloud(point_matrix, n, dim, max_range); // Generate the point cloud
+    const size_t num_neighbors = 10;
+    vector<vector<double>> point_matrix = read_csv("point_cloud_uniform_3D.csv"); // used for storing the point cloud.
+    size_t n = point_matrix.size();
+    //generateRandomPointCloud(point_matrix, n, dim, max_range); // Generate the point cloud
     typedef KDTreeVectorOfVectorsAdaptor<vector<vector<double>>, double> my_kd_tree_t; // make things more readable.
     // Compute the number of bars in the barcode by computing the RNG
     size_t total_death;
