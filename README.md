@@ -47,7 +47,15 @@ g++ -std=c++11 -O3 Final_algorithm_2D.cpp
 and then run the corresponding executable. 
 
 # How to use the 3D file. 
+You will need to make changes to lines 431 and 432 of Final_algorithm_2D.cpp. 
+On line 431 you will need to change the number of neighbors.
+On line 432 you will need to replace the file name with the name of the CSV file you want to use. 
 
+To compile, you will need to type
+
+g++ -std=c++11 -O3 -lmpfr -lgmp Final_algorithm_3D.cpp 
+
+and then run the corresponding executable. 
 
 
 
