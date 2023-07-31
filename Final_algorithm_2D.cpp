@@ -414,7 +414,7 @@ int main (){
     //size_t n = 100; // number of points
 
     double max_range = 10.0; //used in generating max point cloud
-    const size_t num_neighbors = 10; ************* CHANGE NUMBER O CONNECTED COMPONENTS. 
+    const size_t num_neighbors = 10; ************* CHANGE NUMBER OF NEIGHBORS COMPUTED. 
     vector<vector<double>> point_matrix = read_csv("point_cloud_uniform.csv"); *****CHANGE FILE HERE 
     size_t n = point_matrix.size();
     cout << "point matrix successfully made" << endl;
