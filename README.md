@@ -33,5 +33,21 @@ KDTreeVectorOfVectorsAdaptor.h
 
 boost (not necessary if you installed CGAL). 
 
+point_cloud_to_analyse.csv
+
 # How to use the 2D file. 
+You will need to make changes to lines 417 and 418 of Final_algorithm_2D.cpp. 
+On line 417 you will need to change the number of neighbors.
+On line 418 you will need to replace the file name with the name of the CSV file you want to use. 
+
+To compile, you will need to type
+
+g++ -std=c++11 -O3 Final_algorithm_2D.cpp 
+
+and then run the corresponding executable. 
+
+# How to use the 3D file. 
+
+
+
 
