@@ -20,11 +20,17 @@ You will need to install CGAL, which can be found here https://www.cgal.org/down
 # If you want to use both the 2D and 3D version. Your folder from which you will be executing the code from should look like the following. 
 
 Final_algorithm_2D.cpp
+
 README.md
+
 final_algorithm_3D.cpp
+
 delaunator.hpp
+
 nanoflann.hpp
+
 KDTreeVectorOfVectorsAdaptor.h
+
 boost (not necessary if you installed CGAL). 
 
 # How to use the 2D file. 
