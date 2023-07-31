@@ -414,8 +414,8 @@ int main (){
     //size_t n = 100; // number of points
 
     double max_range = 10.0; //used in generating max point cloud
-    const size_t num_neighbors = 10;
-    vector<vector<double>> point_matrix = read_csv("point_cloud_uniform.csv"); // used for storing the point cloud.
+    const size_t num_neighbors = 10; ************* CHANGE NUMBER O CONNECTED COMPONENTS. 
+    vector<vector<double>> point_matrix = read_csv("point_cloud_uniform.csv"); *****CHANGE FILE HERE 
     size_t n = point_matrix.size();
     cout << "point matrix successfully made" << endl;
     for (int i = 0; i < 100; ++i){
@@ -647,6 +647,7 @@ int main (){
     // Now we can begin with the main program
 
     cout << "beginning main program..." << endl;
+    // ****************MAIN PROGRAM STARTS HERE***************
     size_t one_simp_ctr = 0; // one simplex counter
     size_t death_counter = 0;
     // size_t two_simp_ctr = 0; // two simplex counter
