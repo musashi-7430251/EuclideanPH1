@@ -1,8 +1,10 @@
 # Euclidean PH1
-This software will compute the one-dimensional Vietoris-Rips Persistent Homology of a point cloud in low dimensional Euclidean Space. So far we have code for computing the degree-1 Vietoris-Rips persistent homology of point clouds in 2D and 3D. 
+This software will compute the degree-1 Vietoris-Rips Persistent Homology of a point cloud in low dimensional Euclidean Space. So far we have code for computing the degree-1 Vietoris-Rips persistent homology of point clouds in 2D and 3D. 
 
 # How to use this software and warnings
 This software has only been confirmed to be working on Ubuntu Linux, you may run into issues if you use other operating systems or distros. There are two files, one for 2D and one for 3D. One is called final_algorithm_2D.cpp, the other is called final_algorithm_3D.cpp
+
+The algorithm this software is based on does rely on the assumption of pairwise unique distances. However, the software is quite resistant to rounding errors. 
 
 # Requirements 
 You will need the following files from nanoflann  https://github.com/jlblancoc/nanoflann
