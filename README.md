@@ -6,6 +6,11 @@ This software has only been confirmed to be working on Ubuntu Linux, you may run
 
 The algorithm this software is based on does rely on the assumption of pairwise unique distances. However, the software is quite resistant to rounding errors. 
 
+# Limitations
+How many points you are able to compute PH1 for is dependant on:
+- The shape of your point cloud
+- The dimension your point cloud resides in
+
 # Requirements 
 You will need the following files from nanoflann  https://github.com/jlblancoc/nanoflann
 "nanoflann.hpp"
@@ -28,10 +33,15 @@ KDTreeVectorOfVectorsAdaptor.h
 
 point_cloud_to_analyse.csv
 
+# Input file
+This software takes input in the form of a csv file. Your csv file will either consist of 2 columns of numbers corresponding to 
+the x and y co-ordinates of your points or will consist of 3 columns of numbers corresponding to the x,y and z co-ordinates of 
+your points. 
+
 # How to use the 2D file. 
-You will need to make changes to lines 417 and 418 of Final_algorithm_2D.cpp. 
-On line 417 you will need to change the number of neighbors.
-On line 418 you will need to replace the file name with the name of the CSV file you want to use. 
+You will need to make changes to lines 365 and 366 of Final_algorithm_2D.cpp. 
+On line 365 you will need to change the number of neighbors.
+On line 366 you will need to replace the file name with the name of the CSV file you want to use. 
 
 To compile, you will need to type
 
@@ -40,9 +50,9 @@ g++ -std=c++14 -O3 Final_algorithm_2D.cpp -lmpfr -lgmp
 and then run the corresponding executable. 
 
 # How to use the 3D file. 
-You will need to make changes to lines 431 and 432 of Final_algorithm_2D.cpp. 
-On line 431 you will need to change the number of neighbors.
-On line 432 you will need to replace the file name with the name of the CSV file you want to use. 
+You will need to make changes to lines 365 and 366 of Final_algorithm_2D.cpp. 
+On line 365 you will need to change the number of neighbors.
+On line 366 you will need to replace the file name with the name of the CSV file you want to use. 
 
 To compile, you will need to type
 
