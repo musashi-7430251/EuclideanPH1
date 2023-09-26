@@ -19,7 +19,9 @@
 #include "delaunator.hpp"
 #include <stdexcept> // std::runtime_error
 #include <sstream> // std::stringstream
-
+#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
+#include <CGAL/Delaunay_triangulation_2.h>
+#include <CGAL/Triangulation_vertex_base_with_info_2.h>
 using namespace nanoflann;
 using namespace std;
 using namespace std::chrono;
@@ -65,6 +67,15 @@ double l2_dist(vector<double> &v_1, vector<double>  &v_2){
 
     double result = pow(tot_sum,0.5);
     return result;
+}
+
+double l2_dist_2(vector<double> & v_1, vector<double> & v_2){
+    vector<double> v_8 (dim);
+    for (size_t i = 0; i < dim; ++i){
+        v_8[i] = v_1[i]-v_2[i];
+    }
+    double sq_norm = inner_product(v_8.begin(), v_8.end(), v_8.begin(), 0.0);
+    return sq_norm;
 }
 
 bool compare_the_pair(pair<size_t,double> pair_1, pair<size_t,double> pair_2){
@@ -145,76 +156,31 @@ vector<vector<double>> read_csv(string filename){
 
 //======================================== CODE USED TO CALCULATE NUMBER OF CONNECTED COMPONENTS ====================================
 
-// Graph class represents a undirected graph
-// using adjacency list representation
-class Graph {
-    // No. of vertices
-    size_t V;
-
-    // Pointer to an array containing adjacency lists
-    list<size_t>* adj;
-
-    // A function used by DFS
-    void DFSUtil(size_t v, bool visited[]);
-
-public:
-    // Constructor
-    explicit Graph(size_t V);
-
-    void addEdge(size_t v, size_t w);
-    vector<size_t> NumberOfconnectedComponents();
-};
-
-// Function to return the number of
-// connected components in an undirected graph
-vector<size_t> Graph::NumberOfconnectedComponents(){
-
-
-    // Vector to store the single point of each connected component
-    vector<size_t> conn_comp_points;
-    // Mark all the vertices as not visited
-    bool* visited = new bool[V];
-
-    // To store the number of connected components
-    size_t count = 0;
-    for (size_t v = 0; v < V; v++)
-        visited[v] = false;
-
-    for (size_t v = 0; v < V; v++) {
-        if (!visited[v]) { // This means you have a new connected component.
-            conn_comp_points.push_back(v);
-            DFSUtil(v, visited);
-            count += 1;
-        }
+size_t UF_find(size_t i, vector<size_t> & id){
+    while (i != id[i])
+    {
+        id[i] = id[id[i]];
+        i = id[i];
     }
-    delete [] visited;
-    return conn_comp_points;
+    return i;
 }
 
-void Graph::DFSUtil(size_t v, bool visited[])
-{
-
-    // Mark the current node as visited
-    visited[v] = true;
-
-    // Recur for all the vertices
-    // adjacent to this vertex
-    list<size_t>::iterator i;
-
-    for (i = adj[v].begin(); i != adj[v].end(); ++i)
-        if (!visited[*i])
-            DFSUtil(*i, visited);
-}
-
-Graph::Graph(size_t V){
-    this->V = V;
-    adj = new list<size_t>[V];
-}
-
-// Add an undirected edge
-void Graph::addEdge(size_t v, size_t w){
-    adj[v].push_back(w);
-    adj[w].push_back(v);
+void UF_union(size_t p, size_t q, vector<size_t> & id, vector<size_t> & sz){
+    size_t i = UF_find(p,id);
+    size_t j = UF_find(q,id);
+    if (i == j){
+        return;
+    }
+    if (sz[i] < sz[j])
+    {
+        id[i] = j;
+        sz[j] += sz[i];
+    }
+    else
+    {
+        id[j] = i;
+        sz[i] += sz[j];
+    }
 }
 
 //===========AVL TREE CODE==============================================================================
@@ -376,21 +342,7 @@ vector<size_t> FindNode(Node *root, size_t key) {
 }
 
 // Print the tree
-void printTree(Node *root, string indent, bool last) {
-    if (root != nullptr) {
-        cout << indent;
-        if (last) {
-            cout << "R----";
-            indent += "   ";
-        } else {
-            cout << "L----";
-            indent += "|  ";
-        }
-        cout << root->key << endl;
-        printTree(root->left, indent, false);
-        printTree(root->right, indent, true);
-    }
-}
+
 //===========================================================================================================================================================
 // code for diameter
 
@@ -409,78 +361,71 @@ double diam (vector<size_t> vec, vector<vector<double>> & point_matrix){
 
 int main (){
     auto start = high_resolution_clock::now();
-    //First we start off with basic information needed for both computing RNG and persistence
-
-    //size_t n = 100; // number of points
-
-    double max_range = 10.0; //used in generating max point cloud
-    const size_t num_neighbors = 10; ************* CHANGE NUMBER OF NEIGHBORS COMPUTED. 
-    vector<vector<double>> point_matrix = read_csv("point_cloud_uniform.csv"); *****CHANGE FILE HERE 
+    priority_queue<tuple<size_t, size_t, double, size_t>, vector<tuple<size_t, size_t, double, size_t>>, compare_tuple> min_heap;
+    const size_t num_neighbors = 100;
+    vector<vector<double>> point_matrix = read_csv("point_cloud_2D_6.csv"); // used for storing the point cloud.
     size_t n = point_matrix.size();
-    cout << "point matrix successfully made" << endl;
-    for (int i = 0; i < 100; ++i){
-    	for (int j = 0; j < 2; ++j){
-    		if (j == 0){
-    			cout << point_matrix[i][j] << ",";
-    		} else {
-    			cout << point_matrix[i][j] << endl;
-    		}
-    	}
-    }
-    //generateRandomPointCloud(point_matrix, n, dim, max_range); // Generate the point cloud
     typedef KDTreeVectorOfVectorsAdaptor<vector<vector<double>>, double> my_kd_tree_t; // make things more readable.
-    // Compute the number of bars in the barcode by computing the RNG
-    //if (dim == 2) { // This is what we will do if the point cloud is dimension 2.
-
-    //need a set for the unordered edges
-    unordered_set<pair<int, int>, boost::hash<pair<int, int>>> possible_edges;
-    /* x0, y0, x1, y1, ... */
-    vector<double> coords(2 * n); // flattened version of point_matrix
-
-    //populate both vectors
-    for (size_t i = 0; i < 2 * n; ++i) {
-        if (i % 2 == 0) {
-            coords[i] = point_matrix[size_t(i / 2)][0];
-        } else {
-            coords[i] = point_matrix[size_t((i - 1) / 2)][1];
-        }
-    }
-
-    //code for displaying the point cloud
-
     my_kd_tree_t mat_index(dim, point_matrix, 10 /* max leaf */);
-    //triangulation happens here
-    delaunator::Delaunator d(coords);
-    for (size_t i = 0; i < d.triangles.size(); i += 3) {
-        if (d.triangles[i] < d.triangles[i + 1]) {
-            possible_edges.insert(pair<int, int>{d.triangles[i], d.triangles[i + 1]});
+    size_t n_RNG_edges_3 = 0;
+    //populate both vectors
+
+    typedef CGAL::Exact_predicates_inexact_constructions_kernel           K;
+    typedef CGAL::Triangulation_vertex_base_with_info_2<size_t, K>       Vb;
+    typedef CGAL::Triangulation_data_structure_2<Vb>                    Tds;
+    typedef CGAL::Delaunay_triangulation_2<K, Tds>                 Delaunay;
+    typedef K::Point_2 Point;
+    unordered_set<pair<size_t, size_t>, boost::hash<pair<size_t, size_t>>> possible_edges_3;
+    // We need a map from the points of point_matrix to their respective vertex
+    vector< std::pair<Point,size_t> > points;
+
+
+    // Populate the list
+    for (size_t i = 0; i < n; ++i) {
+        points.push_back(make_pair(Point(point_matrix[i][0], point_matrix[i][1]), i));
+    }
+    // Get the actual triangulation
+    Delaunay T(points.begin(), points.end());
+
+    for (Delaunay::Finite_faces_iterator it = T.finite_faces_begin();
+         it != T.finite_faces_end();
+         it++) {
+        auto f=*it;
+        auto v0 = f.vertex(0);
+        auto v1 = f.vertex(1);
+        auto v2 = f.vertex(2);
+        size_t a_idx = points[v0 -> info()].second;
+        size_t b_idx = points[v1 -> info()].second;
+        size_t c_idx = points[v2 -> info()].second;
+        if (a_idx < b_idx) {
+            possible_edges_3.insert(make_pair(a_idx, b_idx));
         } else {
-            possible_edges.insert(pair<int, int>{d.triangles[i + 1], d.triangles[i]});
+            possible_edges_3.insert(make_pair(b_idx, a_idx));
         }
 
-        if (d.triangles[i + 1] < d.triangles[i + 2]) {
-            possible_edges.insert(pair<int, int>{d.triangles[i + 1], d.triangles[i + 2]});
+        if (a_idx < c_idx) {
+            possible_edges_3.insert(make_pair(a_idx, c_idx));
         } else {
-            possible_edges.insert(pair<int, int>{d.triangles[i + 2], d.triangles[i + 1]});
+            possible_edges_3.insert(make_pair(c_idx, a_idx));
         }
 
-        if (d.triangles[i] < d.triangles[i + 2]) {
-            possible_edges.insert(pair<int, int>{d.triangles[i], d.triangles[i + 2]});
+        if (b_idx < c_idx) {
+            possible_edges_3.insert(make_pair(b_idx, c_idx));
         } else {
-            possible_edges.insert(pair<int, int>{d.triangles[i + 2], d.triangles[i]});
+            possible_edges_3.insert(make_pair(c_idx, b_idx));
         }
 
 
     }
-
-    // From possible_edges obtain the edges of the RNG
-    auto n_RNG_edges = size_t(possible_edges.size());
-    for (auto edge: possible_edges) {
-        int a = edge.first;
-        int b = edge.second;
+    // At this stage possible_edges_3 should contain the edges of the Urquhart graph.
+    // Now we can just repeat what we did for the other case
+    n_RNG_edges_3 = possible_edges_3.size();
+    for (auto edge: possible_edges_3) {
+        size_t a = edge.first;
+        size_t b = edge.second;
         vector<double> query_pt_a = point_matrix[a];
         vector<double> query_pt_b = point_matrix[b];
-        double r_2 = pow(coords[2 * a] - coords[2 * b], 2.0) + pow(coords[2 * a + 1] - coords[2 * b + 1], 2.0);
+        double r_2 = l2_dist_2(point_matrix[a], point_matrix[b]);
         vector<nanoflann::ResultItem<size_t, double>> radius_result_vector_a;
         vector<nanoflann::ResultItem<size_t, double>> radius_result_vector_b;
         nanoflann::RadiusResultSet<double> radius_resultSet_a(r_2, radius_result_vector_a);
@@ -527,19 +472,17 @@ int main (){
             r_b.clear();
 
             if (!r_ab.empty()) {
-                n_RNG_edges -= 1;
+                n_RNG_edges_3 -= 1;
             }
+
+            r_ab.clear();
         }
     }
-    // }
-
-
-    cout << n_RNG_edges << endl;
-    size_t total_death = n_RNG_edges - n + 1;
+    cout << n_RNG_edges_3 << endl;
+    size_t total_death = n_RNG_edges_3 - n + 1;
 
     // Node counters
     vector<size_t> zero_vector {0,0,0};
-    vector<size_t> order_added_1;
     size_t node_ctr_1 = 0;
     size_t node_ctr_g_1 = 0;
     // Need to define the number of neighbors we are going to look for.
@@ -557,25 +500,9 @@ int main (){
     // First we need to make the point set. Let's use the function we defined above.
 
     cout << "point matrix is" << endl;
-    /*
-    for (size_t i = 0; i < n; ++i){
-        for (size_t j = 0; j < dim; ++j){
-            if (j == dim - 1){
-                cout << point_matrix[i][j];
-            } else {
-                cout << point_matrix[i][j] << ", ";
-            }
-        }
-        cout << "" << endl;
-    }
-    */
-
-
     // We need to create two sets of two maps for the one and two-simplices.
     map<vector<size_t>, size_t> one_simp_to_idx;
     map<size_t, vector<size_t>> idx_to_one_simp;
-    map<vector<size_t>, size_t> two_simp_to_idx;
-    map<size_t, vector<size_t>> idx_to_two_simp;
 
     // We need to build the kd-tree
     // This line of code is just to make things a bit easier. All we are doing is using
@@ -588,72 +515,57 @@ int main (){
     // Number of neighbors we will initially search for
 
     // vectors to store the output.
-    vector<size_t> ret_indexes(num_neighbors);
-    vector<double> out_dists_sqr(num_neighbors);
-    nanoflann::KNNResultSet<double> resultSet(num_neighbors);
-    resultSet.init(&ret_indexes[0], &out_dists_sqr[0]);
-
-    // We need to create a minimum heap
-    // elements of the minimum heap will be of the form tuple <int_t, int_t, double, int_t>
-    priority_queue<tuple<size_t, size_t, double, size_t>, vector<tuple<size_t, size_t, double, size_t>>, compare_tuple> min_heap;
-
-    cout << "populating N..." << endl;
-
-    // We need to work on populating N
-    for (size_t i = 0; i < n; ++i){
-        // Need to populate the vector N[i]
-        vector<double> query_pt = point_matrix[i];
+    {
         vector<size_t> ret_indexes(num_neighbors);
         vector<double> out_dists_sqr(num_neighbors);
-        resultSet.init(&ret_indexes[0], &out_dists_sqr[0]); // Need to initialise the result set
-        mat_index.index->findNeighbors(resultSet, &query_pt[0]); //This finds the neighbors
-        // Now we need to find the indices greater than i. To this end we have
-        // the following.
-        bool smallest_flag = false;
-        for (size_t j = 0; j < num_neighbors; ++j){
-            if (ret_indexes[j] > i){
-                N[i].push_back(ret_indexes[j]);
-                // We might as well add the smallest length to the minimum heap at this stage.
-                if (!smallest_flag){
-                    min_heap.push(tuple <size_t, size_t, double, size_t> {i, ret_indexes[j], double(pow(out_dists_sqr[j],0.5)), 0});
-                    smallest_flag = true;
+        nanoflann::KNNResultSet<double> resultSet(num_neighbors);
+        resultSet.init(&ret_indexes[0], &out_dists_sqr[0]);
+
+        // We need to create a minimum heap
+        // elements of the minimum heap will be of the form tuple <int_t, int_t, double, int_t>
+
+        cout << "populating N..." << endl;
+
+        // We need to work on populating N
+        for (size_t i = 0; i < n; ++i) {
+            // Need to populate the vector N[i]
+            vector<double> query_pt = point_matrix[i];
+            vector<size_t> ret_indexes(num_neighbors);
+            vector<double> out_dists_sqr(num_neighbors);
+            resultSet.init(&ret_indexes[0], &out_dists_sqr[0]); // Need to initialise the result set
+            mat_index.index->findNeighbors(resultSet, &query_pt[0]); //This finds the neighbors
+            // Now we need to find the indices greater than i. To this end we have
+            // the following.
+            bool smallest_flag = false;
+            for (size_t j = 0; j < num_neighbors; ++j) {
+                if (ret_indexes[j] > i) {
+                    N[i].push_back(ret_indexes[j]);
+                    // We might as well add the smallest length to the minimum heap at this stage.
+                    if (!smallest_flag) {
+                        min_heap.push(tuple<size_t, size_t, double, size_t>{i, ret_indexes[j],
+                                                                            double(pow(out_dists_sqr[j], 0.5)), 0});
+                        smallest_flag = true;
+                    }
                 }
             }
+            // Need to clear these so that they can be used again.
+            ret_indexes.clear();
+            out_dists_sqr.clear();
         }
-        // Need to clear these so that they can be used again.
-        ret_indexes.clear();
-        out_dists_sqr.clear();
     }
-    // Display N
-    /*
-    for (size_t w = 0; w < n; ++w){
-        for (size_t x : N[w]){
-            cout << x << ", " ;
-        }
-        cout << "" << endl;
-    }
-    */
 
-    // Display minimum heap
-
-    // Here we find k_d. The number of barcodes we expect to find.
-    // For now just set k_d to some number
-    // size_t k_d = ???
-    // We need to use the other program in order to get this number.
-    // For now we will just check a certain number of edges like in the matlab program.
-
-    // size_t n_edges_checked = 2000;
-
-    // Now we can begin with the main program
 
     cout << "beginning main program..." << endl;
-    // ****************MAIN PROGRAM STARTS HERE***************
     size_t one_simp_ctr = 0; // one simplex counter
     size_t death_counter = 0;
     // size_t two_simp_ctr = 0; // two simplex counter
     while (death_counter < total_death){
+        cout << one_simp_ctr << endl;
+        if (one_simp_ctr == 599){
+            cout << "lol" << endl;
+        }
+        cout << death_counter << endl;
         size_t min_heap_flag = 0;
-        // cout << i << endl;
         tuple<size_t, size_t, double, size_t> tuple_now = min_heap.top();
         min_heap.pop();
         size_t a = get<0>(tuple_now);
@@ -665,6 +577,14 @@ int main (){
         one_simp_ctr += 1;
         double r = get<2>(tuple_now);
         // cout << r << endl;
+        if (r > 0.2355 and r < 0.24){
+            //cout << "lol" << endl;
+            // sort(barcode_bars.rbegin(), barcode_bars.rend());
+            //for (auto bar: barcode_bars){
+            //   cout << bar[0] << ", " << bar[1] << endl;
+            // }
+            cout << "lol" << endl;
+        }
         size_t t = get<3>(tuple_now);
         // cout << t << endl;
         if (t + 2 > size_t(N[a].size())){ // If true we need to update N[a]
@@ -716,7 +636,6 @@ int main (){
         sort(radius_result_vector_a.begin(), radius_result_vector_a.end(), compare_result_vector);
         sort(radius_result_vector_b.begin(), radius_result_vector_b.end(), compare_result_vector);
 
-
         size_t n_ra = radius_result_vector_a.size() - 1;
         size_t n_rb = radius_result_vector_b.size() - 1;
 
@@ -726,9 +645,6 @@ int main (){
 
             vector<size_t> r_a (n_ra);
             vector<size_t> r_b (n_rb);
-
-
-            // cout << "created vectors for intersection..." << endl;
 
             for (size_t j = 0; j < n_ra; ++j){
                 r_a[j] = radius_result_vector_a[j+1].first;
@@ -741,44 +657,8 @@ int main (){
             sort(r_a.begin(), r_a.end());
             sort(r_b.begin(), r_b.end());
             // At this stage we have r_a and r_b. Now we need to find the intersection of r_a and r_b
-
-            // cout << "intersecting the vectors" << endl;
-            /*size_t n_rab;
-            if (n_ra >= n_rb){
-                n_rab = n_ra;
-            } else {
-                n_rab = n_rb;
-            }
-            */
             vector<size_t> r_ab;
-            /*
-            cout << "-----------------------" << endl;
-            for (size_t u = 0; u < n_ra; ++u){
-                cout << r_a[u] << ", " ;
-            }
-            cout << "" << endl;
-
-            for (size_t u = 0; u < n_rb; ++u){
-                cout << r_b[u] << ", " ;
-            }
-            cout << "" << endl;
-            cout << "------------------------" << endl;
-            */
             set_intersection(r_a.begin(), r_a.end(), r_b.begin(), r_b.end(), back_inserter(r_ab));
-
-            //At this stage r_ab should contain the intersection between a and b.
-
-            // Print the contents of r_ab for testing purposes
-
-            /*
-            cout << "***********************************" << endl;
-            if (r_ab.size() > 0){
-                for (size_t z = 0; z < size_t(r_ab.size()); ++z){
-                    cout << r_ab[z] << endl;
-                }
-                cout << "***********************************" << endl;
-            }
-            */
             r_a.clear();
             r_b.clear();
 
@@ -791,73 +671,112 @@ int main (){
                 column_counter += 1;
                 vector<size_t> two_simp_to_add {a,b,r_ab[0]};
                 sort(two_simp_to_add.begin(), two_simp_to_add.end());
-                two_simp_to_idx[two_simp_to_add] = column_counter;
-                idx_to_two_simp[column_counter] = two_simp_to_add;
                 size_t p_1 = one_simp_to_idx[ vector<size_t> {two_simp_to_add[0],two_simp_to_add[1]}];
                 size_t p_2 = one_simp_to_idx[ vector<size_t> {two_simp_to_add[1],two_simp_to_add[2]}];
                 size_t p_3 = one_simp_to_idx[ vector<size_t> {two_simp_to_add[0],two_simp_to_add[2]}];
-                //cout << p_1 << endl;
-                //cout << p_2 << endl;
-                //cout << p_3 << endl;
                 vector<size_t> vector_to_add = {p_1, p_2, p_3};
                 sort(vector_to_add.begin(), vector_to_add.end());
-                //cout << vector_to_add.size()<< endl;
                 size_t l_value = *max_element(vector_to_add.begin(), vector_to_add.end());
-                //cout << l_value << endl;
-                // printTree(root_1, "", true);
-                /*
-                for (size_t i_2 = 0; i_2 < order_added_1.size(); ++i_2){
-                    cout << order_added_1[i_2] << ", ";
-                }
-                cout << "" << endl;
-                */
-                // cout << "----------------------------" << endl;
-                // Now we need to add this node to the AVL tree.
-                // cout << "What about here?" << endl;
                 root_1 = insertNode(root_1, l_value, vector_to_add);
-                // printTree(root_1, "", true);
-                order_added_1.push_back(l_value);
                 node_ctr_1 += 1;
-                // cout << "value of node_ctr_1 is " << node_ctr_1 << endl;
-                // cout << "is it here?" << endl;
-                // cout << r_ab[0] << endl;
-                // cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^";
                 vector_to_add.clear();
             } else if (n_rab > 1){
-                // cout << "making graph..." << endl;
-                Graph prox_graph(n_rab);
-                // We need to add the edges to the graph
-                for (size_t k = 1; k < n_rab; ++k){
-                    for (size_t y = 0; y < k; ++y){
-                        double r_r = l2_dist(point_matrix[r_ab[y]], point_matrix[r_ab[k]]);
-                        if (r_r < r){
-                            prox_graph.addEdge(y,k);
-                            // cout << "edge added..." << endl;
+                size_t n_conn_comp = 0;
+                vector<size_t> conn_comp_vector_dash;
+                if (n_rab == 2){
+                    double r_r = l2_dist(point_matrix[r_ab[0]], point_matrix[r_ab[1]]);
+                    if (r_r < r){ // one connected component
+                        n_conn_comp = 1;
+                    } else {
+                        n_conn_comp = 2;
+                        conn_comp_vector_dash = {r_ab[0],r_ab[1]};
+                    }
+                } else { // We have at least three points meaning it makes sense to have a delaunay triangulation
+                    //populate both vectors
+                    vector< std::pair<Point,size_t> > points_loc;
+                    unordered_set<pair<size_t, size_t>, boost::hash<pair<size_t, size_t>>> possible_edges_loc;
+                    for (size_t j = 0; j < n_rab; ++j){
+                        points_loc.push_back(make_pair(Point(point_matrix[r_ab[j]][0], point_matrix[r_ab[j]][1]),j));
+                    }
+                    // Get the actual triangulation
+                    Delaunay T_loc(points_loc.begin(), points_loc.end());
+
+                    for (Delaunay::Finite_faces_iterator it = T_loc.finite_faces_begin();
+                         it != T_loc.finite_faces_end();
+                         it++) {
+                        auto f=*it;
+                        auto v0 = f.vertex(0);
+                        auto v1 = f.vertex(1);
+                        auto v2 = f.vertex(2);
+                        size_t c_idx = points[v0 -> info()].second;
+                        size_t a_idx = points[v1 -> info()].second;
+                        size_t b_idx = points[v2 -> info()].second;
+                        if (a_idx < b_idx){
+                            possible_edges_loc.insert(make_pair(a_idx,b_idx));
+                        } else {
+                            possible_edges_loc.insert(make_pair(b_idx,a_idx));
+                        }
+
+                        if (a_idx < c_idx){
+                            possible_edges_loc.insert(make_pair(a_idx,c_idx));
+                        } else {
+                            possible_edges_loc.insert(make_pair(c_idx,a_idx));
+                        }
+
+                        if (b_idx < c_idx){
+                            possible_edges_loc.insert(make_pair(b_idx,c_idx));
+                        } else {
+                            possible_edges_loc.insert(make_pair(c_idx,b_idx));
                         }
                     }
-                }
-                // cout << "finding connected components..." << endl;
-                vector<size_t> conn_comp_vector_dash = prox_graph.NumberOfconnectedComponents(); // actually gives you a vector
-                // with a point from each connected component.
-                // need to change the indices to their corresponding values in r_ab.
-                // cout << "we are ok" << endl;
-                size_t n_conn_comp = conn_comp_vector_dash.size();
 
-                // cout << "finding conn_comp_vector..." << endl;
-                for (size_t k = 0; k < n_conn_comp; ++k){
-                    size_t replace_value = conn_comp_vector_dash[k];
-                    conn_comp_vector_dash[k] = r_ab[replace_value];
-                    //cout << conn_comp_vector_dash[k] << ", ";
+                    // Now we need to find the number of connected components of the graph
+                    // We'll just use the current graph code that we have for this
+                    {
+                        vector<size_t> id (n_rab);
+                        vector<size_t> sz (n_rab);
+                        for (size_t qq = 0; qq < n_rab; ++qq){
+                            id[qq] = qq;
+                            sz[qq] = 1;
+                        }
+
+                        for (auto edge_2: possible_edges_loc) {
+                            // We need to add the edges to the graph
+
+
+                            double r_r = l2_dist(point_matrix[r_ab[edge_2.first]], point_matrix[r_ab[edge_2.second]]);
+                            if (r_r < r) {
+                                UF_union(edge_2.first, edge_2.second,id, sz);
+
+                                // cout << "edge added..." << endl;
+                            }
+
+
+                            // cout << "finding connected components..." << endl;
+                        }
+                        for (size_t zz = 0; zz < n_rab; ++zz){
+                            id[zz] = UF_find(zz,id);
+                        }
+                        sort( id.begin(), id.end() );
+                        id.erase( unique( id.begin(), id.end() ), id.end() );
+                        conn_comp_vector_dash = id;
+                    }
+                    n_conn_comp = conn_comp_vector_dash.size();
+
+                    for (size_t k = 0; k < n_conn_comp; ++k){
+                        size_t replace_value = conn_comp_vector_dash[k];
+                        conn_comp_vector_dash[k] = r_ab[replace_value];
+                        //cout << conn_comp_vector_dash[k] << ", ";
+                    }
                 }
-                //cout << "" << endl;
-                // cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^";
+
+                //We create another delaunay triangulation
+
                 if (n_conn_comp == 1){ // In this case we essentially have a copy of the case above
                     // cout << " ACTIVATING THIS PART OF CODE" << endl;
                     column_counter += 1;
                     vector<size_t> two_simp_to_add = {a,b,r_ab[0]};
                     sort(two_simp_to_add.begin(), two_simp_to_add.end());
-                    two_simp_to_idx[two_simp_to_add] = column_counter;
-                    idx_to_two_simp[column_counter] = two_simp_to_add;
                     size_t p_1 = one_simp_to_idx[ vector<size_t> {two_simp_to_add[0],two_simp_to_add[1]}];
                     size_t p_2 = one_simp_to_idx[ vector<size_t> {two_simp_to_add[1],two_simp_to_add[2]}];
                     size_t p_3 = one_simp_to_idx[ vector<size_t> {two_simp_to_add[0],two_simp_to_add[2]}];
@@ -867,7 +786,6 @@ int main (){
                     // cout << "L VALUE IS" << l_value << endl;
                     // Now we need to add this node to the AVL tree.
                     root_1 = insertNode(root_1, l_value, vector_to_add);
-                    order_added_1.push_back(l_value);
                     node_ctr_1 += 1;
                     // cout << "value of node_ctr_1 is " << node_ctr_1 << endl;
                     vector_to_add.clear();
@@ -878,8 +796,6 @@ int main (){
                         column_counter += 1;
                         vector<size_t> two_simp_to_add = {a,b,conn_comp_vector_dash[c]};
                         sort(two_simp_to_add.begin(), two_simp_to_add.end());
-                        two_simp_to_idx[two_simp_to_add] = column_counter;
-                        idx_to_two_simp[column_counter] = two_simp_to_add;
                         size_t p_1 = one_simp_to_idx[ vector<size_t> {two_simp_to_add[0],two_simp_to_add[1]}];
                         size_t p_2 = one_simp_to_idx[ vector<size_t> {two_simp_to_add[1],two_simp_to_add[2]}];
                         size_t p_3 = one_simp_to_idx[ vector<size_t> {two_simp_to_add[0],two_simp_to_add[2]}];
@@ -927,7 +843,7 @@ int main (){
                             // cout << "value of node_ctr_g_1 is " << node_ctr_g_1 << endl;
                             // At this stage (l_value, column_counter) is a persistent pair
                             double diam_one_simp = diam(idx_to_one_simp[l_value], point_matrix);
-                            double diam_two_simp = diam(idx_to_two_simp[column_counter], point_matrix);
+                            double diam_two_simp = diam(two_simp_to_add, point_matrix);
                             // cout << diam_one_simp << endl;
                             // cout << diam_two_simp << endl;
                             if (diam_one_simp - diam_two_simp != 0) {
@@ -957,6 +873,7 @@ int main (){
     }
 
     sort(barcode_bars.rbegin(), barcode_bars.rend());
+
     for (auto bar: barcode_bars){
         cout << bar[0] << ", " << bar[1] << endl;
     }
@@ -968,4 +885,3 @@ int main (){
     cout << test_vec.max_size() << endl;
     return 0;
 }
-
