@@ -363,7 +363,7 @@ int main (){
     auto start = high_resolution_clock::now();
     priority_queue<tuple<size_t, size_t, double, size_t>, vector<tuple<size_t, size_t, double, size_t>>, compare_tuple> min_heap;
     const size_t num_neighbors = 100;
-    vector<vector<double>> point_matrix = read_csv("point_cloud_2D_6.csv"); // used for storing the point cloud.
+    vector<vector<double>> point_matrix = read_csv("annulus_2d_5000.csv"); // used for storing the point cloud.
     size_t n = point_matrix.size();
     typedef KDTreeVectorOfVectorsAdaptor<vector<vector<double>>, double> my_kd_tree_t; // make things more readable.
     my_kd_tree_t mat_index(dim, point_matrix, 10 /* max leaf */);
@@ -483,6 +483,7 @@ int main (){
 
     // Node counters
     vector<size_t> zero_vector {0,0,0};
+    vector<double> zero_vector_2d {0.0,0.0};
     size_t node_ctr_1 = 0;
     size_t node_ctr_g_1 = 0;
     // Need to define the number of neighbors we are going to look for.
@@ -561,9 +562,6 @@ int main (){
     // size_t two_simp_ctr = 0; // two simplex counter
     while (death_counter < total_death){
         cout << one_simp_ctr << endl;
-        if (one_simp_ctr == 599){
-            cout << "lol" << endl;
-        }
         cout << death_counter << endl;
         size_t min_heap_flag = 0;
         tuple<size_t, size_t, double, size_t> tuple_now = min_heap.top();
@@ -577,14 +575,6 @@ int main (){
         one_simp_ctr += 1;
         double r = get<2>(tuple_now);
         // cout << r << endl;
-        if (r > 0.2355 and r < 0.24){
-            //cout << "lol" << endl;
-            // sort(barcode_bars.rbegin(), barcode_bars.rend());
-            //for (auto bar: barcode_bars){
-            //   cout << bar[0] << ", " << bar[1] << endl;
-            // }
-            cout << "lol" << endl;
-        }
         size_t t = get<3>(tuple_now);
         // cout << t << endl;
         if (t + 2 > size_t(N[a].size())){ // If true we need to update N[a]
@@ -603,179 +593,84 @@ int main (){
             double r_dash = l2_dist(point_matrix[a],point_matrix[b_dash]);
             //cout << "MAYBE IT DID NOT LIKE THIS PART" << endl;
             size_t t_dash = t + 1;
-
-            // Now we need to add the new tuple to the heap
             min_heap.push(tuple<size_t, size_t, double, size_t> {a, b_dash, r_dash, t_dash});
         }
-        // cout << "doing a radius search..." << endl;
-        // do a radius search
-        double search_radius = pow(r,2.0);
+
+        // We will implement a quick check to see if we can avoid a lot of computation.
+        vector<double> mid_point(dim);
+
+        //Fill in the entries of mid_point.
+        for (size_t i = 0; i < dim; ++i) {
+            mid_point[i] = (point_matrix[a][i] + point_matrix[b][i]) / 2.0;
+        }
+
+        double r_small = pow(0.5 * (2 - pow(3.0, 0.5)) * r, 2.0);
+        vector<nanoflann::ResultItem<size_t, double>> radius_result_vector_small;
+
+
+        double search_radius = pow(r, 2.0);
         // vector<pair<size_t, double>> match_dist;
         vector<double> query_pt_a = point_matrix[a];
         vector<double> query_pt_b = point_matrix[b];
 
-
+        nanoflann::RadiusResultSet<double> radius_resultSet_small(r_small, radius_result_vector_small);
+        mat_index.index->findNeighbors(radius_resultSet_small, &mid_point[0]);
         // cout << "creating nanoflann structures..." << endl;
 
-        vector<nanoflann::ResultItem<size_t, double>> radius_result_vector_a;
-        vector<nanoflann::ResultItem<size_t, double>> radius_result_vector_b;
-        nanoflann::RadiusResultSet<double> radius_resultSet_a(search_radius,radius_result_vector_a);
-        nanoflann::RadiusResultSet<double> radius_resultSet_b(search_radius,radius_result_vector_b);
+        if (radius_resultSet_small.empty()){
+            vector<nanoflann::ResultItem<size_t, double>> radius_result_vector_a;
+            vector<nanoflann::ResultItem<size_t, double>> radius_result_vector_b;
+            nanoflann::RadiusResultSet<double> radius_resultSet_a(search_radius,radius_result_vector_a);
+            nanoflann::RadiusResultSet<double> radius_resultSet_b(search_radius,radius_result_vector_b);
 
-        // cout << "using nanoflann to find radius..." << endl;
+            // cout << "using nanoflann to find radius..." << endl;
 
-        // radius_resultSet.init();
-        mat_index.index-> findNeighbors(radius_resultSet_a, &query_pt_a[0]);
+            // radius_resultSet.init();
+            mat_index.index-> findNeighbors(radius_resultSet_a, &query_pt_a[0]);
 
-        // cout << "calculating radius again..." << endl;
-        mat_index.index-> findNeighbors(radius_resultSet_b, &query_pt_b[0]);
+            // cout << "calculating radius again..." << endl;
+            mat_index.index-> findNeighbors(radius_resultSet_b, &query_pt_b[0]);
 
-        // cout << "Used nanoflann to find radius..." << endl;
+            // cout << "Used nanoflann to find radius..." << endl;
 
-        // We need to sort the radius result vectors
-        sort(radius_result_vector_a.begin(), radius_result_vector_a.end(), compare_result_vector);
-        sort(radius_result_vector_b.begin(), radius_result_vector_b.end(), compare_result_vector);
+            // We need to sort the radius result vectors
+            sort(radius_result_vector_a.begin(), radius_result_vector_a.end(), compare_result_vector);
+            sort(radius_result_vector_b.begin(), radius_result_vector_b.end(), compare_result_vector);
 
-        size_t n_ra = radius_result_vector_a.size() - 1;
-        size_t n_rb = radius_result_vector_b.size() - 1;
+            size_t n_ra = radius_result_vector_a.size() - 1;
+            size_t n_rb = radius_result_vector_b.size() - 1;
 
-        // cout << n_ra << endl;
-        // cout << n_rb << endl;
-        if ((n_ra != 0) and (n_rb != 0)){
+            // cout << n_ra << endl;
+            // cout << n_rb << endl;
+            if ((n_ra != 0) and (n_rb != 0)){
 
-            vector<size_t> r_a (n_ra);
-            vector<size_t> r_b (n_rb);
+                vector<size_t> r_a (n_ra);
+                vector<size_t> r_b (n_rb);
 
-            for (size_t j = 0; j < n_ra; ++j){
-                r_a[j] = radius_result_vector_a[j+1].first;
-            }
-
-            for (size_t j = 0; j < n_rb; ++j){
-                r_b[j] = radius_result_vector_b[j+1].first;
-            }
-            // We need to sort the vectors or else the intersection won't work
-            sort(r_a.begin(), r_a.end());
-            sort(r_b.begin(), r_b.end());
-            // At this stage we have r_a and r_b. Now we need to find the intersection of r_a and r_b
-            vector<size_t> r_ab;
-            set_intersection(r_a.begin(), r_a.end(), r_b.begin(), r_b.end(), back_inserter(r_ab));
-            r_a.clear();
-            r_b.clear();
-
-            // Now we are at the stage where we find the number of connected components
-            size_t n_rab = r_ab.size();
-
-            // cout << n_rab << endl;
-
-            if (n_rab == 1){ // only one point in the lune
-                column_counter += 1;
-                vector<size_t> two_simp_to_add {a,b,r_ab[0]};
-                sort(two_simp_to_add.begin(), two_simp_to_add.end());
-                size_t p_1 = one_simp_to_idx[ vector<size_t> {two_simp_to_add[0],two_simp_to_add[1]}];
-                size_t p_2 = one_simp_to_idx[ vector<size_t> {two_simp_to_add[1],two_simp_to_add[2]}];
-                size_t p_3 = one_simp_to_idx[ vector<size_t> {two_simp_to_add[0],two_simp_to_add[2]}];
-                vector<size_t> vector_to_add = {p_1, p_2, p_3};
-                sort(vector_to_add.begin(), vector_to_add.end());
-                size_t l_value = *max_element(vector_to_add.begin(), vector_to_add.end());
-                root_1 = insertNode(root_1, l_value, vector_to_add);
-                node_ctr_1 += 1;
-                vector_to_add.clear();
-            } else if (n_rab > 1){
-                size_t n_conn_comp = 0;
-                vector<size_t> conn_comp_vector_dash;
-                if (n_rab == 2){
-                    double r_r = l2_dist(point_matrix[r_ab[0]], point_matrix[r_ab[1]]);
-                    if (r_r < r){ // one connected component
-                        n_conn_comp = 1;
-                    } else {
-                        n_conn_comp = 2;
-                        conn_comp_vector_dash = {r_ab[0],r_ab[1]};
-                    }
-                } else { // We have at least three points meaning it makes sense to have a delaunay triangulation
-                    //populate both vectors
-                    vector< std::pair<Point,size_t> > points_loc;
-                    unordered_set<pair<size_t, size_t>, boost::hash<pair<size_t, size_t>>> possible_edges_loc;
-                    for (size_t j = 0; j < n_rab; ++j){
-                        points_loc.push_back(make_pair(Point(point_matrix[r_ab[j]][0], point_matrix[r_ab[j]][1]),j));
-                    }
-                    // Get the actual triangulation
-                    Delaunay T_loc(points_loc.begin(), points_loc.end());
-
-                    for (Delaunay::Finite_faces_iterator it = T_loc.finite_faces_begin();
-                         it != T_loc.finite_faces_end();
-                         it++) {
-                        auto f=*it;
-                        auto v0 = f.vertex(0);
-                        auto v1 = f.vertex(1);
-                        auto v2 = f.vertex(2);
-                        size_t c_idx = points[v0 -> info()].second;
-                        size_t a_idx = points[v1 -> info()].second;
-                        size_t b_idx = points[v2 -> info()].second;
-                        if (a_idx < b_idx){
-                            possible_edges_loc.insert(make_pair(a_idx,b_idx));
-                        } else {
-                            possible_edges_loc.insert(make_pair(b_idx,a_idx));
-                        }
-
-                        if (a_idx < c_idx){
-                            possible_edges_loc.insert(make_pair(a_idx,c_idx));
-                        } else {
-                            possible_edges_loc.insert(make_pair(c_idx,a_idx));
-                        }
-
-                        if (b_idx < c_idx){
-                            possible_edges_loc.insert(make_pair(b_idx,c_idx));
-                        } else {
-                            possible_edges_loc.insert(make_pair(c_idx,b_idx));
-                        }
-                    }
-
-                    // Now we need to find the number of connected components of the graph
-                    // We'll just use the current graph code that we have for this
-                    {
-                        vector<size_t> id (n_rab);
-                        vector<size_t> sz (n_rab);
-                        for (size_t qq = 0; qq < n_rab; ++qq){
-                            id[qq] = qq;
-                            sz[qq] = 1;
-                        }
-
-                        for (auto edge_2: possible_edges_loc) {
-                            // We need to add the edges to the graph
-
-
-                            double r_r = l2_dist(point_matrix[r_ab[edge_2.first]], point_matrix[r_ab[edge_2.second]]);
-                            if (r_r < r) {
-                                UF_union(edge_2.first, edge_2.second,id, sz);
-
-                                // cout << "edge added..." << endl;
-                            }
-
-
-                            // cout << "finding connected components..." << endl;
-                        }
-                        for (size_t zz = 0; zz < n_rab; ++zz){
-                            id[zz] = UF_find(zz,id);
-                        }
-                        sort( id.begin(), id.end() );
-                        id.erase( unique( id.begin(), id.end() ), id.end() );
-                        conn_comp_vector_dash = id;
-                    }
-                    n_conn_comp = conn_comp_vector_dash.size();
-
-                    for (size_t k = 0; k < n_conn_comp; ++k){
-                        size_t replace_value = conn_comp_vector_dash[k];
-                        conn_comp_vector_dash[k] = r_ab[replace_value];
-                        //cout << conn_comp_vector_dash[k] << ", ";
-                    }
+                for (size_t j = 0; j < n_ra; ++j){
+                    r_a[j] = radius_result_vector_a[j+1].first;
                 }
 
-                //We create another delaunay triangulation
+                for (size_t j = 0; j < n_rb; ++j){
+                    r_b[j] = radius_result_vector_b[j+1].first;
+                }
+                // We need to sort the vectors or else the intersection won't work
+                sort(r_a.begin(), r_a.end());
+                sort(r_b.begin(), r_b.end());
+                // At this stage we have r_a and r_b. Now we need to find the intersection of r_a and r_b
+                vector<size_t> r_ab;
+                set_intersection(r_a.begin(), r_a.end(), r_b.begin(), r_b.end(), back_inserter(r_ab));
+                r_a.clear();
+                r_b.clear();
 
-                if (n_conn_comp == 1){ // In this case we essentially have a copy of the case above
-                    // cout << " ACTIVATING THIS PART OF CODE" << endl;
+                // Now we are at the stage where we find the number of connected components
+                size_t n_rab = r_ab.size();
+
+                // cout << n_rab << endl;
+
+                if (n_rab == 1){ // only one point in the lune
                     column_counter += 1;
-                    vector<size_t> two_simp_to_add = {a,b,r_ab[0]};
+                    vector<size_t> two_simp_to_add {a,b,r_ab[0]};
                     sort(two_simp_to_add.begin(), two_simp_to_add.end());
                     size_t p_1 = one_simp_to_idx[ vector<size_t> {two_simp_to_add[0],two_simp_to_add[1]}];
                     size_t p_2 = one_simp_to_idx[ vector<size_t> {two_simp_to_add[1],two_simp_to_add[2]}];
@@ -783,18 +678,134 @@ int main (){
                     vector<size_t> vector_to_add = {p_1, p_2, p_3};
                     sort(vector_to_add.begin(), vector_to_add.end());
                     size_t l_value = *max_element(vector_to_add.begin(), vector_to_add.end());
-                    // cout << "L VALUE IS" << l_value << endl;
-                    // Now we need to add this node to the AVL tree.
                     root_1 = insertNode(root_1, l_value, vector_to_add);
                     node_ctr_1 += 1;
-                    // cout << "value of node_ctr_1 is " << node_ctr_1 << endl;
                     vector_to_add.clear();
-                    two_simp_to_add.clear();
-                } else {
-                    for (size_t c = 0; c < n_conn_comp; ++c){
-                        // cout << "WE HAVE MORE THAN ONE CONNECTED COMPONENT" << endl;
+                } else if (n_rab > 1){
+                    size_t n_conn_comp = 0;
+                    vector<size_t> conn_comp_vector_dash;
+                    if (n_rab == 2){
+                        double r_r = l2_dist(point_matrix[r_ab[0]], point_matrix[r_ab[1]]);
+                        if (r_r < r){ // one connected component
+                            n_conn_comp = 1;
+                        } else {
+                            n_conn_comp = 2;
+                            conn_comp_vector_dash = {r_ab[0],r_ab[1]};
+                        }
+                    } else { // We have at least three points meaning it makes sense to have a delaunay triangulation
+                        //populate both vectors
+
+                        // First we make a brief check to see if we even need the Delaunay triangulation
+                        // auto n_check = (size_t) sqrt(n_rab);
+			// auto n_gap = (size_t) sqrt(n_rab);
+                        // Now we need to generate n_check numbers between 1 and n_rab
+                        bool eye_flag = false; //Need this to test if there is a point in the eye shape
+                        for (size_t j = 0; j < n_rab; ++j){
+                            // size_t temp_idx = r_ab[rand()%n_rab];
+                            size_t temp_idx = r_ab[j];
+                            // Need to check the angle of the temporary idx
+                            vector<double> temp_u (dim);
+                            vector<double> temp_v (dim);
+                            for (size_t k = 0; k < dim; ++k){
+                                temp_u[k] = point_matrix[a][k] - point_matrix[temp_idx][k];
+                                temp_v[k] = point_matrix[b][k] - point_matrix[temp_idx][k];
+                            }
+                            double norm_u = l2_dist(temp_u,zero_vector_2d);
+                            double norm_v = l2_dist(temp_v,zero_vector_2d);
+                            double cos_value = inner_product(temp_u.begin(), temp_u.end(), temp_v.begin(),0.0)/(norm_u*norm_v);
+                            if (cos_value < -0.8660254038){
+                                eye_flag = true;
+                                break;
+                            }
+                        }
+                        if (not eye_flag){
+                            vector< std::pair<Point,size_t> > points_loc;
+                            unordered_set<pair<size_t, size_t>, boost::hash<pair<size_t, size_t>>> possible_edges_loc;
+                            for (size_t j = 0; j < n_rab; ++j){
+                                points_loc.push_back(make_pair(Point(point_matrix[r_ab[j]][0], point_matrix[r_ab[j]][1]),j));
+                            }
+                            // Get the actual triangulation
+                            Delaunay T_loc(points_loc.begin(), points_loc.end());
+
+                            for (Delaunay::Finite_faces_iterator it = T_loc.finite_faces_begin();
+                                 it != T_loc.finite_faces_end();
+                                 it++) {
+                                auto f=*it;
+                                auto v0 = f.vertex(0);
+                                auto v1 = f.vertex(1);
+                                auto v2 = f.vertex(2);
+                                size_t c_idx = points[v0 -> info()].second;
+                                size_t a_idx = points[v1 -> info()].second;
+                                size_t b_idx = points[v2 -> info()].second;
+                                if (a_idx < b_idx){
+                                    possible_edges_loc.insert(make_pair(a_idx,b_idx));
+                                } else {
+                                    possible_edges_loc.insert(make_pair(b_idx,a_idx));
+                                }
+
+                                if (a_idx < c_idx){
+                                    possible_edges_loc.insert(make_pair(a_idx,c_idx));
+                                } else {
+                                    possible_edges_loc.insert(make_pair(c_idx,a_idx));
+                                }
+
+                                if (b_idx < c_idx){
+                                    possible_edges_loc.insert(make_pair(b_idx,c_idx));
+                                } else {
+                                    possible_edges_loc.insert(make_pair(c_idx,b_idx));
+                                }
+                            }
+
+                            // Now we need to find the number of connected components of the graph
+                            // We'll just use the current graph code that we have for this
+                            {
+                                vector<size_t> id (n_rab);
+                                vector<size_t> sz (n_rab);
+                                for (size_t qq = 0; qq < n_rab; ++qq){
+                                    id[qq] = qq;
+                                    sz[qq] = 1;
+                                }
+
+                                for (auto edge_2: possible_edges_loc) {
+                                    // We need to add the edges to the graph
+
+
+                                    double r_r = l2_dist(point_matrix[r_ab[edge_2.first]], point_matrix[r_ab[edge_2.second]]);
+                                    if (r_r < r) {
+                                        UF_union(edge_2.first, edge_2.second,id, sz);
+
+                                        // cout << "edge added..." << endl;
+                                    }
+
+
+                                    // cout << "finding connected components..." << endl;
+                                }
+                                for (size_t zz = 0; zz < n_rab; ++zz){
+                                    id[zz] = UF_find(zz,id);
+                                }
+                                sort( id.begin(), id.end() );
+                                id.erase( unique( id.begin(), id.end() ), id.end() );
+                                conn_comp_vector_dash = id;
+                            }
+                            n_conn_comp = conn_comp_vector_dash.size();
+
+                            for (size_t k = 0; k < n_conn_comp; ++k){
+                                size_t replace_value = conn_comp_vector_dash[k];
+                                conn_comp_vector_dash[k] = r_ab[replace_value];
+                                //cout << conn_comp_vector_dash[k] << ", ";
+                            }
+                        } else { // eye_flag is true
+                            n_conn_comp = 1;
+                        }
+
+                    }
+
+                    //We create another delaunay triangulation
+
+                    if (n_conn_comp == 1){ // In this case we essentially have a copy of the case above
+                        // cout << " ACTIVATING THIS PART OF CODE" << endl;
                         column_counter += 1;
-                        vector<size_t> two_simp_to_add = {a,b,conn_comp_vector_dash[c]};
+                        vector<size_t> two_simp_to_add = {a,b,r_ab[0]};
                         sort(two_simp_to_add.begin(), two_simp_to_add.end());
                         size_t p_1 = one_simp_to_idx[ vector<size_t> {two_simp_to_add[0],two_simp_to_add[1]}];
                         size_t p_2 = one_simp_to_idx[ vector<size_t> {two_simp_to_add[1],two_simp_to_add[2]}];
@@ -802,78 +813,118 @@ int main (){
                         vector<size_t> vector_to_add = {p_1, p_2, p_3};
                         sort(vector_to_add.begin(), vector_to_add.end());
                         size_t l_value = *max_element(vector_to_add.begin(), vector_to_add.end());
-                        size_t flag_4 = 0;
-                        size_t flag_5 = 0;
-                        //cout << l_value << endl;
-                        while (flag_4 == 0 and flag_5 == 0) {
-                            if (FindNode(root_1, l_value) != zero_vector ){
-                                // cout << "SEARCHING BINARY TREE 1" << endl;
-                                vector<size_t> new_vector = FindNode(root_1, l_value);
-                                vector<size_t> symm_diff_vec;
-                                set_symmetric_difference(new_vector.begin(), new_vector.end(), vector_to_add.begin(), vector_to_add.end(), back_inserter(symm_diff_vec));
-                                vector_to_add = symm_diff_vec;
-                                symm_diff_vec.clear();
-                                if (vector_to_add.size() > 0){
-                                    l_value = *max_element(vector_to_add.begin(), vector_to_add.end());
-                                } else {
-                                    flag_5 = 1;
-                                }
-                                // sort(vector_to_add.begin(), vector_to_add.end());
-                            } else if (FindNode(root_g_1, l_value) != zero_vector) {
-                                // cout << "SEARCHING BINARY TREE 2" << endl;
-                                vector<size_t> new_vector = FindNode(root_g_1, l_value);
-                                vector<size_t> symm_diff_vec;
-                                set_symmetric_difference(new_vector.begin(), new_vector.end(), vector_to_add.begin(), vector_to_add.end(), back_inserter(symm_diff_vec));
-                                vector_to_add = symm_diff_vec;
-                                symm_diff_vec.clear();
-                                if (vector_to_add.size() > 0){
-                                    l_value = *max_element(vector_to_add.begin(), vector_to_add.end());
-                                } else {
-                                    flag_5 = 1;
-                                }
-                                // sort(vector_to_add.begin(), vector_to_add.end());
-                            } else {
-                                // cout << "SEARCHING OVER" << endl;
-                                flag_4 = 1; // The column is reduced.
-                            }
-                        }
-                        if (flag_5 == 0) {
-                            root_g_1 = insertNode(root_g_1, l_value, vector_to_add);
-                            node_ctr_g_1 += 1;
-                            // cout << "value of node_ctr_g_1 is " << node_ctr_g_1 << endl;
-                            // At this stage (l_value, column_counter) is a persistent pair
-                            double diam_one_simp = diam(idx_to_one_simp[l_value], point_matrix);
-                            double diam_two_simp = diam(two_simp_to_add, point_matrix);
-                            // cout << diam_one_simp << endl;
-                            // cout << diam_two_simp << endl;
-                            if (diam_one_simp - diam_two_simp != 0) {
-                                barcode_bars.push_back(vector<double>{diam_one_simp, diam_two_simp});
-                                death_counter += 1;
-                            }
-                        }
+                        // cout << "L VALUE IS" << l_value << endl;
+                        // Now we need to add this node to the AVL tree.
+                        root_1 = insertNode(root_1, l_value, vector_to_add);
+                        node_ctr_1 += 1;
+                        // cout << "value of node_ctr_1 is " << node_ctr_1 << endl;
                         vector_to_add.clear();
                         two_simp_to_add.clear();
+                    } else {
+                        for (size_t c = 0; c < n_conn_comp; ++c){
+                            // cout << "WE HAVE MORE THAN ONE CONNECTED COMPONENT" << endl;
+                            column_counter += 1;
+                            vector<size_t> two_simp_to_add = {a,b,conn_comp_vector_dash[c]};
+                            sort(two_simp_to_add.begin(), two_simp_to_add.end());
+                            size_t p_1 = one_simp_to_idx[ vector<size_t> {two_simp_to_add[0],two_simp_to_add[1]}];
+                            size_t p_2 = one_simp_to_idx[ vector<size_t> {two_simp_to_add[1],two_simp_to_add[2]}];
+                            size_t p_3 = one_simp_to_idx[ vector<size_t> {two_simp_to_add[0],two_simp_to_add[2]}];
+                            vector<size_t> vector_to_add = {p_1, p_2, p_3};
+                            sort(vector_to_add.begin(), vector_to_add.end());
+                            size_t l_value = *max_element(vector_to_add.begin(), vector_to_add.end());
+                            size_t flag_4 = 0;
+                            size_t flag_5 = 0;
+                            //cout << l_value << endl;
+                            while (flag_4 == 0 and flag_5 == 0) {
+                                if (FindNode(root_1, l_value) != zero_vector ){
+                                    // cout << "SEARCHING BINARY TREE 1" << endl;
+                                    vector<size_t> new_vector = FindNode(root_1, l_value);
+                                    vector<size_t> symm_diff_vec;
+                                    set_symmetric_difference(new_vector.begin(), new_vector.end(), vector_to_add.begin(), vector_to_add.end(), back_inserter(symm_diff_vec));
+                                    vector_to_add = symm_diff_vec;
+                                    symm_diff_vec.clear();
+                                    if (vector_to_add.size() > 0){
+                                        l_value = *max_element(vector_to_add.begin(), vector_to_add.end());
+                                    } else {
+                                        flag_5 = 1;
+                                    }
+                                    // sort(vector_to_add.begin(), vector_to_add.end());
+                                } else if (FindNode(root_g_1, l_value) != zero_vector) {
+                                    // cout << "SEARCHING BINARY TREE 2" << endl;
+                                    vector<size_t> new_vector = FindNode(root_g_1, l_value);
+                                    vector<size_t> symm_diff_vec;
+                                    set_symmetric_difference(new_vector.begin(), new_vector.end(), vector_to_add.begin(), vector_to_add.end(), back_inserter(symm_diff_vec));
+                                    vector_to_add = symm_diff_vec;
+                                    symm_diff_vec.clear();
+                                    if (vector_to_add.size() > 0){
+                                        l_value = *max_element(vector_to_add.begin(), vector_to_add.end());
+                                    } else {
+                                        flag_5 = 1;
+                                    }
+                                    // sort(vector_to_add.begin(), vector_to_add.end());
+                                } else {
+                                    // cout << "SEARCHING OVER" << endl;
+                                    flag_4 = 1; // The column is reduced.
+                                }
+                            }
+                            if (flag_5 == 0) {
+                                root_g_1 = insertNode(root_g_1, l_value, vector_to_add);
+                                node_ctr_g_1 += 1;
+                                // cout << "value of node_ctr_g_1 is " << node_ctr_g_1 << endl;
+                                // At this stage (l_value, column_counter) is a persistent pair
+                                double diam_one_simp = diam(idx_to_one_simp[l_value], point_matrix);
+                                double diam_two_simp = diam(two_simp_to_add, point_matrix);
+                                // cout << diam_one_simp << endl;
+                                // cout << diam_two_simp << endl;
+                                if (diam_one_simp - diam_two_simp != 0) {
+                                    barcode_bars.push_back(vector<double>{diam_one_simp, diam_two_simp});
+                                    death_counter += 1;
+                                }
+                            }
+                            vector_to_add.clear();
+                            two_simp_to_add.clear();
+                        }
+                        // printTree(root_g_1, "", true);
                     }
-                    // printTree(root_g_1, "", true);
+
+
+                } else { // n_rab = 0
+                    // cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
                 }
 
+                // At this stage it is safe to clear r_ab
+                // At this stage conn_comp_vector should contain one point from each connected component.
 
-            } else { // n_rab = 0
-                // cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
+                r_ab.clear();
             }
-
-            // At this stage it is safe to clear r_ab
-            // At this stage conn_comp_vector should contain one point from each connected component.
-
-            r_ab.clear();
+        } else {
+            column_counter += 1;
+            vector<size_t> two_simp_to_add = {a,b,radius_result_vector_small[0].first};
+            sort(two_simp_to_add.begin(), two_simp_to_add.end());
+            size_t p_1 = one_simp_to_idx[ vector<size_t> {two_simp_to_add[0],two_simp_to_add[1]}];
+            size_t p_2 = one_simp_to_idx[ vector<size_t> {two_simp_to_add[1],two_simp_to_add[2]}];
+            size_t p_3 = one_simp_to_idx[ vector<size_t> {two_simp_to_add[0],two_simp_to_add[2]}];
+            vector<size_t> vector_to_add = {p_1, p_2, p_3};
+            sort(vector_to_add.begin(), vector_to_add.end());
+            size_t l_value = *max_element(vector_to_add.begin(), vector_to_add.end());
+            // cout << "L VALUE IS" << l_value << endl;
+            // Now we need to add this node to the AVL tree.
+            root_1 = insertNode(root_1, l_value, vector_to_add);
+            node_ctr_1 += 1;
+            // cout << "value of node_ctr_1 is " << node_ctr_1 << endl;
+            vector_to_add.clear();
+            two_simp_to_add.clear();
         }
-
-
 
     }
 
-    sort(barcode_bars.rbegin(), barcode_bars.rend());
-
+    // sort(barcode_bars.rbegin(), barcode_bars.rend());
+    ofstream out;
+    out.open("out.txt");
+    for (auto bar: barcode_bars){
+        out << bar[0] << ", " << bar[1] << endl;
+    }
+    out.close();
     for (auto bar: barcode_bars){
         cout << bar[0] << ", " << bar[1] << endl;
     }
