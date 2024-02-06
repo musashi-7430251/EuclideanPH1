@@ -39,26 +39,24 @@ the x and y co-ordinates of your points or will consist of 3 columns of numbers 
 your points. 
 
 # How to use the 2D file. 
-You will need to make changes to lines 365 and 366 of Final_algorithm_2D.cpp. 
-On line 365 you will need to change the number of neighbors.
-On line 366 you will need to replace the file name with the name of the CSV file you want to use. 
+ 
 
 To compile, you will need to type
 
-g++ -std=c++14 -O3 Final_algorithm_2D.cpp -lmpfr -lgmp
+g++ -std=c++14 -O3 Final_algorithm_2D.cpp -o Final_algorithm_2D -lmpfr -lgmp
 
-and then run the corresponding executable. 
+Then to run, choose your value of k (100 in this example) and type the following 
+
+Final_algorithm_2D point_cloud_to_analyse.csv 100
 
 # How to use the 3D file. 
-You will need to make changes to lines 365 and 366 of Final_algorithm_2D.cpp. 
-On line 365 you will need to change the number of neighbors.
-On line 366 you will need to replace the file name with the name of the CSV file you want to use. 
-
 To compile, you will need to type
 
-g++ -std=c++11 -O3 Final_algorithm_3D.cpp -lmpfr -lgmp
+g++ -std=c++14 -O3 Final_algorithm_3D.cpp -o Final_algorithm_3D -lmpfr -lgmp
 
-and then run the corresponding executable. 
+Then to run, choose your value of k (100 in this example) and type the following. 
+
+Final_algorithm_3D point_cloud_to_analyse.csv 100 
 
 
 
