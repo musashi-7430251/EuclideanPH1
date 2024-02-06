@@ -48,7 +48,15 @@ void generateRandomPointCloud(vector<vector<double>>& point_matrix, const size_t
 struct compare_tuple {
     bool operator()(const tuple <size_t, size_t, double, size_t> & tuple_1, const tuple <size_t, size_t, double, size_t> & tuple_2)
     {
-        return get<2>(tuple_1) > get<2>(tuple_2);
+        if (get<2>(tuple_1) != get<2>(tuple_2)){
+            return get<2>(tuple_1) > get<2>(tuple_2);
+        } else {
+            if (get<0>(tuple_1) != get<0>(tuple_2)){
+                return get<0>(tuple_1) > get<0>(tuple_2);
+            } else {
+                return get<1>(tuple_1) > get<1>(tuple_2);
+            }
+        }
     }
 };
 
@@ -360,11 +368,11 @@ double diam (vector<size_t> vec, vector<vector<double>> & point_matrix){
     }
 }
 
-int main (){
+int main (int argc, char** argv){
     auto start = high_resolution_clock::now();
     priority_queue<tuple<size_t, size_t, double, size_t>, vector<tuple<size_t, size_t, double, size_t>>, compare_tuple> min_heap;
-    const size_t num_neighbors = 100;
-    vector<vector<double>> point_matrix = read_csv("torus_3d_5000.csv"); // used for storing the point cloud.
+    const size_t num_neighbors = stoi(argv[2]);
+    vector<vector<double>> point_matrix = read_csv(argv[1]); // used for storing the point cloud.
     size_t n = point_matrix.size();
     typedef KDTreeVectorOfVectorsAdaptor<vector<vector<double>>, double> my_kd_tree_t; // make things more readable.
     my_kd_tree_t mat_index(dim, point_matrix, 10 /* max leaf */);
@@ -426,6 +434,8 @@ int main (){
     for (auto edge: possible_edges_3) {
         size_t a = edge.first;
         size_t b = edge.second;
+        vector<size_t> lune_gen_vec = {a,b};
+        sort(lune_gen_vec.begin(), lune_gen_vec.end());
         vector<double> query_pt_a = point_matrix[a];
         vector<double> query_pt_b = point_matrix[b];
         double r_2 = l2_dist_2(point_matrix[a], point_matrix[b]);
@@ -473,7 +483,51 @@ int main (){
 
             r_a.clear();
             r_b.clear();
-
+            size_t n_ab = r_ab.size();
+            for (size_t j = n_ab - 1; j == 0; --j){
+                vector<size_t> vec_to_check_a = {a, r_ab[j]};
+                vector<size_t> vec_to_check_b = {b, r_ab[j]};
+                sort(vec_to_check_a.begin(), vec_to_check_a.end());
+                sort(vec_to_check_b.begin(), vec_to_check_b.end());
+                double r_11 = l2_dist_2(point_matrix[a], point_matrix[r_ab[j]]);
+                double r_22 = l2_dist_2(point_matrix[b], point_matrix[r_ab[j]]);
+                if (r_11 <= r_2 && r_22 <= r_2) {
+                    // Now we need to continue to check these
+                    if (r_11 < r_2 && r_22 < r_2){
+                        // In this case it is definitely in the lune
+                        // Thus we continue
+                        continue;
+                    } else {
+                        if (r_11 == r_2 && r_22 < r_2){
+                            // In this case we need to check if sort([a r_ab[j]]) < [a b]
+                            // Now we need to compare vec_to_check and lune_gen_vec
+                            if (vec_to_check_a < lune_gen_vec){
+                                continue;
+                            } else {
+                                r_ab.erase(r_ab.begin()+j);
+                            }
+                        } else if (r_11 < r_2 && r_22 == r_2){
+                            // We just do the same thing as we did above
+                            // In this case we need to check if sort([a r_ab[j]]) < [a b]
+                            // Now we need to compare vec_to_check and lune_gen_vec
+                            if (vec_to_check_b < lune_gen_vec){
+                                continue;
+                            } else {
+                                r_ab.erase(r_ab.begin()+j);
+                            }
+                        } else { // r_11 == r_2 && r_22 == r_2
+                            // In this case we need to check both the vectors
+                            if (vec_to_check_a < lune_gen_vec && vec_to_check_b < lune_gen_vec){
+                                continue;
+                            } else {
+                                r_ab.erase(r_ab.begin()+j);
+                            }
+                        }
+                    }
+                } else {
+                    r_ab.erase(r_ab.begin()+j);
+                }
+            }
             if (!r_ab.empty()) {
                 n_RNG_edges_3 -= 1;
             }
@@ -562,12 +616,10 @@ int main (){
     cout << "beginning main program..." << endl;
     size_t one_simp_ctr = 0; // one simplex counter
     size_t death_counter = 0;
+    size_t two_simp_ctr = 0;
     // size_t two_simp_ctr = 0; // two simplex counter
     while (death_counter < total_death) {
         cout << one_simp_ctr << endl;
-        if (one_simp_ctr == 599) {
-            cout << "lol" << endl;
-        }
         cout << death_counter << endl;
         size_t min_heap_flag = 0;
         tuple<size_t, size_t, double, size_t> tuple_now = min_heap.top();
@@ -576,6 +628,8 @@ int main (){
         // cout << a << endl;
         size_t b = get<1>(tuple_now);
         // cout << b << endl;
+        vector<size_t> lune_gen_vec = {a,b};
+        sort(lune_gen_vec.begin(), lune_gen_vec.end());
         one_simp_to_idx[vector<size_t>{a, b}] = one_simp_ctr;
         idx_to_one_simp[one_simp_ctr] = vector<size_t>{a, b};
         one_simp_ctr += 1;
@@ -673,9 +727,54 @@ int main (){
                 r_b.clear();
 
                 // Now we are at the stage where we find the number of connected components
-                size_t n_rab = r_ab.size();
+                size_t n_rab_2 = r_ab.size();
+                for (size_t j = n_rab_2 - 1; j == 0; --j){
+                    vector<size_t> vec_to_check_a = {a, r_ab[j]};
+                    vector<size_t> vec_to_check_b = {b, r_ab[j]};
+                    sort(vec_to_check_a.begin(), vec_to_check_a.end());
+                    sort(vec_to_check_b.begin(), vec_to_check_b.end());
+                    double r_11 = l2_dist(point_matrix[a], point_matrix[r_ab[j]]);
+                    double r_22 = l2_dist(point_matrix[b], point_matrix[r_ab[j]]);
+                    if (r_11 <= r && r_22 <= r) {
+                        // Now we need to continue to check these
+                        if (r_11 < r && r_22 < r){
+                            // In this case it is definitely in the lune
+                            // Thus we continue
+                            continue;
+                        } else {
+                            if (r_11 == r && r_22 < r){
+                                // In this case we need to check if sort([a r_ab[j]]) < [a b]
+                                // Now we need to compare vec_to_check and lune_gen_vec
+                                if (vec_to_check_a < lune_gen_vec){
+                                    continue;
+                                } else {
+                                    r_ab.erase(r_ab.begin()+j);
+                                }
+                            } else if (r_11 < r && r_22 == r){
+                                // We just do the same thing as we did above
+                                // In this case we need to check if sort([a r_ab[j]]) < [a b]
+                                // Now we need to compare vec_to_check and lune_gen_vec
+                                if (vec_to_check_b < lune_gen_vec){
+                                    continue;
+                                } else {
+                                    r_ab.erase(r_ab.begin()+j);
+                                }
+                            } else { // r_11 == r_2 && r_22 == r_2
+                                // In this case we need to check both the vectors
+                                if (vec_to_check_a < lune_gen_vec && vec_to_check_b < lune_gen_vec){
+                                    continue;
+                                } else {
+                                    r_ab.erase(r_ab.begin()+j);
+                                }
+                            }
+                        }
+                    } else {
+                        r_ab.erase(r_ab.begin()+j);
+                    }
+                }
 
                 // cout << n_rab << endl;
+                size_t n_rab = r_ab.size();
 
                 if (n_rab == 1) { // only one point in the lune
                     column_counter += 1;
@@ -689,6 +788,7 @@ int main (){
                     size_t l_value = *max_element(vector_to_add.begin(), vector_to_add.end());
                     root_1 = insertNode(root_1, l_value, vector_to_add);
                     node_ctr_1 += 1;
+                    two_simp_ctr += 1;
                     vector_to_add.clear();
                 } else if (n_rab > 1) {
                     size_t n_conn_comp = 0;
@@ -706,7 +806,6 @@ int main (){
 
                         // Before finding all connected components in the lune. Let us run a quick test
                         bool eye_flag = false; //Need this to test if there is a point in the eye shape
-                        
                         for (size_t j = 0; j < n_rab; ++j){
                             // size_t temp_idx = r_ab[rand()%n_rab];
                             size_t temp_idx = r_ab[j];
@@ -826,6 +925,7 @@ int main (){
                         // Now we need to add this node to the AVL tree.
                         root_1 = insertNode(root_1, l_value, vector_to_add);
                         node_ctr_1 += 1;
+                        two_simp_ctr += 1;
                         // cout << "value of node_ctr_1 is " << node_ctr_1 << endl;
                         vector_to_add.clear();
                         two_simp_to_add.clear();
@@ -835,6 +935,7 @@ int main (){
                             column_counter += 1;
                             vector<size_t> two_simp_to_add = {a, b, conn_comp_vector_dash[c]};
                             sort(two_simp_to_add.begin(), two_simp_to_add.end());
+                            two_simp_ctr += 1;
                             size_t p_1 = one_simp_to_idx[vector<size_t>{two_simp_to_add[0], two_simp_to_add[1]}];
                             size_t p_2 = one_simp_to_idx[vector<size_t>{two_simp_to_add[1], two_simp_to_add[2]}];
                             size_t p_3 = one_simp_to_idx[vector<size_t>{two_simp_to_add[0], two_simp_to_add[2]}];
@@ -932,7 +1033,7 @@ int main (){
         }
     }
 
-    // sort(barcode_bars.rbegin(), barcode_bars.rend());
+    sort(barcode_bars.rbegin(), barcode_bars.rend());
     // write to file
     ofstream out;
     out.open("out.txt");
@@ -944,13 +1045,13 @@ int main (){
     for (auto bar: barcode_bars){
         cout << bar[0] << ", " << bar[1] << endl;
     }
-    for (auto bar: barcode_bars){
-        cout << bar[0] << ", " << bar[1] << endl;
-    }
-
+    
     auto stop = high_resolution_clock::now();
     auto duration = duration_cast<microseconds>(stop - start);
     cout << "Time taken by function: " << double(duration.count() / 1000000) << " seconds" << endl;
+    cout << "Number of 1-simplices used:" << one_simp_ctr << endl;
+    cout << "Number of 2-simplices used:" << column_counter << endl;
+    cout << "Number of non apparent persistent pairs:" << death_counter << endl;
     vector<double> test_vec;
     cout << test_vec.max_size() << endl;
     return 0;
