@@ -28,6 +28,7 @@ using namespace std;
 using namespace std::chrono;
 
 static size_t dim = 3;
+static double epsilon = pow(10.0,-14.0);
 
 // Function to generate random point cloud. (From nanoflann)
 void generateRandomPointCloud(vector<vector<double>>& point_matrix, const size_t n_points, const size_t dimension, const double max_range = 10.0){
@@ -142,7 +143,7 @@ vector<vector<double>> read_csv(string filename){
         vector<double> new_vector;
         // Extract each integer
         while(ss >> val){
-            cout << val << endl;
+            // cout << val << endl;
             // Add the current integer to the 'colIdx' column's values vector
             new_vector.push_back(val);
 
@@ -438,7 +439,7 @@ int main (int argc, char** argv){
         sort(lune_gen_vec.begin(), lune_gen_vec.end());
         vector<double> query_pt_a = point_matrix[a];
         vector<double> query_pt_b = point_matrix[b];
-        double r_2 = l2_dist_2(point_matrix[a], point_matrix[b]);
+        double r_2 = l2_dist_2(point_matrix[a], point_matrix[b])+ epsilon;
         vector<nanoflann::ResultItem<size_t, double>> radius_result_vector_a;
         vector<nanoflann::ResultItem<size_t, double>> radius_result_vector_b;
         nanoflann::RadiusResultSet<double> radius_resultSet_a(r_2, radius_result_vector_a);
@@ -606,9 +607,17 @@ int main (int argc, char** argv){
                     }
                 }
             }
+            
+            if (!smallest_flag and i != n - 1){
+            	//need to find all neighbors
+            	N[i] = find_all_neighbors(i, point_matrix, n);
+            	min_heap.push(tuple<size_t, size_t, double, size_t>{i, N[i][0], l2_dist(point_matrix[i],point_matrix[N[i][0]]), 0});
+            }
+            
             // Need to clear these so that they can be used again.
             ret_indexes.clear();
             out_dists_sqr.clear();
+            
         }
     }
 
@@ -672,7 +681,7 @@ int main (int argc, char** argv){
         vector<nanoflann::ResultItem<size_t, double>> radius_result_vector_small;
 
 
-        double search_radius = pow(r, 2.0);
+        double search_radius = pow(r, 2.0) + epsilon;
         // vector<pair<size_t, double>> match_dist;
         vector<double> query_pt_a = point_matrix[a];
         vector<double> query_pt_b = point_matrix[b];
