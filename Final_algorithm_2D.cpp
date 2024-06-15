@@ -27,7 +27,7 @@ using namespace std;
 using namespace std::chrono;
 
 static size_t dim = 2;
-static double epsilon = pow(10.0,-10.0);
+static double epsilon = pow(10.0,-14.0);
 
 // Function to generate random point cloud. (From nanoflann)
 void generateRandomPointCloud(vector<vector<double>>& point_matrix, const size_t n_points, const size_t dimension, const double max_range = 10.0){
@@ -494,12 +494,12 @@ int main (int argc, char** argv){
                 double r_22 = l2_dist_2(point_matrix[b], point_matrix[r_ab[j]]);
                 if (r_11 <= r_2 && r_22 <= r_2) {
                     // Now we need to continue to check these
-                    if (r_11 < r_2 && r_22 < r_2){
+                    if (r_2 - r_11 >= epsilon && r_2 - r_22 >= epsilon){
                         // In this case it is definitely in the lune
                         // Thus we continue
                         continue;
                     } else {
-                        if (r_11 == r_2 && r_22 < r_2){
+                        if (r_2 - r_11 < epsilon && r_22 < r_2){
                             // In this case we need to check if sort([a r_ab[j]]) < [a b]
                             // Now we need to compare vec_to_check and lune_gen_vec
                             if (vec_to_check_a < lune_gen_vec){
@@ -507,7 +507,7 @@ int main (int argc, char** argv){
                             } else {
                                 r_ab.erase(r_ab.begin()+j);
                             }
-                        } else if (r_11 < r_2 && r_22 == r_2){
+                        } else if (r_11 < r_2 && r_2 - r_22 < epsilon){
                             // We just do the same thing as we did above
                             // In this case we need to check if sort([a r_ab[j]]) < [a b]
                             // Now we need to compare vec_to_check and lune_gen_vec
@@ -607,6 +607,13 @@ int main (int argc, char** argv){
                     }
                 }
             }
+            
+            if (!smallest_flag and i != n - 1){
+            	//need to find all neighbors
+            	N[i] = find_all_neighbors(i, point_matrix, n);
+            	min_heap.push(tuple<size_t, size_t, double, size_t>{i, N[i][0], l2_dist(point_matrix[i],point_matrix[N[i][0]]), 0});
+            }
+            
             // Need to clear these so that they can be used again.
             ret_indexes.clear();
             out_dists_sqr.clear();
@@ -737,12 +744,12 @@ int main (int argc, char** argv){
                     double r_22 = l2_dist(point_matrix[b], point_matrix[r_ab[j]]);
                     if (r_11 <= r && r_22 <= r) {
                         // Now we need to continue to check these
-                        if (r_11 < r && r_22 < r){
+                        if (r - r_11 >= epsilon && r - r_22 >= epsilon){
                             // In this case it is definitely in the lune
                             // Thus we continue
                             continue;
                         } else {
-                            if (r_11 == r && r_22 < r){
+                            if (r - r_11 < epsilon && r_22 < r){
                                 // In this case we need to check if sort([a r_ab[j]]) < [a b]
                                 // Now we need to compare vec_to_check and lune_gen_vec
                                 if (vec_to_check_a < lune_gen_vec){
@@ -750,7 +757,7 @@ int main (int argc, char** argv){
                                 } else {
                                     r_ab.erase(r_ab.begin()+j);
                                 }
-                            } else if (r_11 < r && r_22 == r){
+                            } else if (r_11 < r && r - r_22 < epsilon){
                                 // We just do the same thing as we did above
                                 // In this case we need to check if sort([a r_ab[j]]) < [a b]
                                 // Now we need to compare vec_to_check and lune_gen_vec
