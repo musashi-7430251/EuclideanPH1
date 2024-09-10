@@ -4,8 +4,6 @@ This software will compute the degree-1 Vietoris-Rips Persistent Homology of a p
 # How to use this software and warnings
 This software has only been confirmed to be working on Ubuntu Linux, you may run into issues if you use other operating systems or distros. There are two files, one for 2D and one for 3D. One is called final_algorithm_2D.cpp, the other is called final_algorithm_3D.cpp
 
-The algorithm this software is based on does rely on the assumption of pairwise unique distances. However, the software is quite resistant to rounding errors. 
-
 # Limitations
 How many points you are able to compute PH1 for is dependant on:
 - The shape of your point cloud
