@@ -372,9 +372,17 @@ double diam (vector<size_t> vec, vector<vector<double>> & point_matrix){
 int main (int argc, char** argv){
     auto start = high_resolution_clock::now();
     priority_queue<tuple<size_t, size_t, double, size_t>, vector<tuple<size_t, size_t, double, size_t>>, compare_tuple> min_heap;
-    const size_t num_neighbors = stoi(argv[2]);
+    size_t num_neighbors = stoi(argv[2]);
+    
     vector<vector<double>> point_matrix = read_csv(argv[1]); // used for storing the point cloud.
     size_t n = point_matrix.size();
+    
+    if (num_neighbors == 0){
+    	num_neighbors = pow(n, 0.5);
+    }
+    
+    cout << "the value of num_neighbors is " << num_neighbors << endl;
+    
     typedef KDTreeVectorOfVectorsAdaptor<vector<vector<double>>, double> my_kd_tree_t; // make things more readable.
     my_kd_tree_t mat_index(dim, point_matrix, 10 /* max leaf */);
     size_t n_RNG_edges_3 = 0;
