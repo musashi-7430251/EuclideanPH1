@@ -60,6 +60,15 @@ Final_algorithm_3D point_cloud_to_analyse.csv 100
 
 Choosing k = 0 will cause the program to default to using k = sqrt(n)
 
+# How to use the nD file. 
+To compile, you will need to type
 
+g++ -std=c++14 -O3 Final_algorithm_3D.cpp -o Final_algorithm_nD 
+
+Then to run, choose your value of k (100 in this example) and type the following. 
+
+Final_algorithm_3D point_cloud_to_analyse.csv 100 
+
+Choosing k = 0 will cause the program to default to using k = sqrt(n)
 
 
