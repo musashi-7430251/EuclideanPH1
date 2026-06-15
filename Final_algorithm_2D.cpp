@@ -16,7 +16,6 @@
 #include <map>
 #include <list>
 #include <boost/container_hash/hash.hpp>
-#include "delaunator.hpp"
 #include <stdexcept> // std::runtime_error
 #include <sstream> // std::stringstream
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
